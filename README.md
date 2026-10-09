@@ -31,7 +31,7 @@ npm run dev
 
 ## 部署（Cloudflare Pages → 免费 `xxx.pages.dev`）
 
-当前推荐先用平台免费域名，例如 `https://tangdejiang.pages.dev`（项目名可自定）。
+当前目标免费域名：`https://dejiang.pages.dev`（Cloudflare Pages 项目名设为 `dejiang`）。
 
 ### A. 推荐：GitHub 连接（以后改代码自动更新）
 
