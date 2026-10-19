@@ -33,8 +33,16 @@ body {
   font-family: var(--font-sans);
   color: var(--ink);
   background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(15, 122, 108, 0.16), transparent 55%),
-    radial-gradient(900px 500px at -10% 20%, rgba(196, 92, 38, 0.08), transparent 50%),
+    radial-gradient(
+      1200px 600px at 85% -10%,
+      rgba(15, 122, 108, 0.16),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px 500px at -10% 20%,
+      rgba(196, 92, 38, 0.08),
+      transparent 50%
+    ),
     linear-gradient(180deg, #e8eef2 0%, var(--bg) 42%, #eef3f5 100%);
   background-attachment: fixed;
   line-height: 1.65;
@@ -231,7 +239,11 @@ textarea {
   border-radius: var(--radius);
   font-weight: 500;
   text-decoration: none;
-  transition: transform 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
 }
 
 .btn:hover {
@@ -504,7 +516,7 @@ textarea {
 .article__body pre {
   overflow-x: auto;
   padding: 1rem;
-  background: #142028;
+  background: var(--ink);
   color: #e8eef2;
   border-radius: var(--radius);
   font-family: var(--font-mono);

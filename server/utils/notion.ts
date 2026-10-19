@@ -1,11 +1,11 @@
 import { Client } from '@notionhq/client'
-import type { BlogPost, BlogPostMeta } from '~/data/site'
+import type { BlogPost, BlogPostMeta } from '~/types/blog'
 
-type NotionRichText = {
+interface NotionRichText {
   plain_text: string
 }
 
-type NotionPage = {
+interface NotionPage {
   id: string
   properties: Record<string, any>
   cover?: {
@@ -14,6 +14,17 @@ type NotionPage = {
     file?: { url: string }
   } | null
 }
+
+const PROPERTY_ALIASES = {
+  title: ['Title', 'Name', '标题', '名称'],
+  status: ['Status', '状态'],
+  slug: ['Slug', 'slug', '路径'],
+  summary: ['Summary', '摘要', 'Description', '描述'],
+  date: ['Date', '日期', 'Published', '发布日期'],
+  tags: ['Tags', '标签', 'Tag'],
+} as const
+
+const PUBLISHED_STATUS_PATTERN = /published|发布|公开/i
 
 const PLACEHOLDER_POSTS: BlogPost[] = [
   {
@@ -41,166 +52,8 @@ const PLACEHOLDER_POSTS: BlogPost[] = [
   },
 ]
 
-function plainText(rich: NotionRichText[] | undefined): string {
-  return (rich || []).map((t) => t.plain_text).join('')
-}
-
-function getProp(page: NotionPage, names: string[]) {
-  for (const name of names) {
-    if (page.properties[name]) return page.properties[name]
-  }
-  return undefined
-}
-
-function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w\u4e00-\u9fff-]/g, '')
-    .replace(/-+/g, '-')
-    .slice(0, 80) || 'post'
-}
-
-function mapPageMeta(page: NotionPage): BlogPostMeta | null {
-  const titleProp = getProp(page, ['Title', 'Name', '标题', '名称'])
-  const title =
-    titleProp?.type === 'title'
-      ? plainText(titleProp.title)
-      : titleProp?.type === 'rich_text'
-        ? plainText(titleProp.rich_text)
-        : ''
-
-  if (!title) return null
-
-  const statusProp = getProp(page, ['Status', '状态'])
-  const status =
-    statusProp?.type === 'select'
-      ? statusProp.select?.name || ''
-      : statusProp?.type === 'status'
-        ? statusProp.status?.name || ''
-        : 'Published'
-
-  if (status && !/published|发布|公开/i.test(status)) {
-    return null
-  }
-
-  const slugProp = getProp(page, ['Slug', 'slug', '路径'])
-  const slugRaw =
-    slugProp?.type === 'rich_text'
-      ? plainText(slugProp.rich_text)
-      : slugProp?.type === 'url'
-        ? slugProp.url || ''
-        : ''
-  const slug = slugRaw || slugify(title)
-
-  const summaryProp = getProp(page, ['Summary', '摘要', 'Description', '描述'])
-  const summary =
-    summaryProp?.type === 'rich_text'
-      ? plainText(summaryProp.rich_text)
-      : ''
-
-  const dateProp = getProp(page, ['Date', '日期', 'Published', '发布日期'])
-  const date =
-    dateProp?.type === 'date'
-      ? dateProp.date?.start || ''
-      : new Date().toISOString().slice(0, 10)
-
-  const tagsProp = getProp(page, ['Tags', '标签', 'Tag'])
-  const tags =
-    tagsProp?.type === 'multi_select'
-      ? tagsProp.multi_select.map((t: { name: string }) => t.name)
-      : []
-
-  let cover: string | undefined
-  if (page.cover?.type === 'external') cover = page.cover.external?.url
-  if (page.cover?.type === 'file') cover = page.cover.file?.url
-
-  return {
-    id: page.id,
-    title,
-    slug,
-    summary,
-    date,
-    tags,
-    cover,
-  }
-}
-
-async function blocksToHtml(client: Client, blockId: string): Promise<string> {
-  const chunks: string[] = []
-  let cursor: string | undefined
-
-  do {
-    const res = await client.blocks.children.list({
-      block_id: blockId,
-      start_cursor: cursor,
-      page_size: 100,
-    })
-
-    for (const block of res.results as any[]) {
-      if (!('type' in block)) continue
-      const type = block.type as string
-      const data = block[type]
-      const text = plainText(data?.rich_text)
-
-      switch (type) {
-        case 'paragraph':
-          chunks.push(`<p>${escapeHtml(text)}</p>`)
-          break
-        case 'heading_1':
-          chunks.push(`<h1>${escapeHtml(text)}</h1>`)
-          break
-        case 'heading_2':
-          chunks.push(`<h2>${escapeHtml(text)}</h2>`)
-          break
-        case 'heading_3':
-          chunks.push(`<h3>${escapeHtml(text)}</h3>`)
-          break
-        case 'bulleted_list_item':
-          chunks.push(`<li>${escapeHtml(text)}</li>`)
-          break
-        case 'numbered_list_item':
-          chunks.push(`<li>${escapeHtml(text)}</li>`)
-          break
-        case 'quote':
-          chunks.push(`<blockquote><p>${escapeHtml(text)}</p></blockquote>`)
-          break
-        case 'code':
-          chunks.push(
-            `<pre><code>${escapeHtml(plainText(data?.rich_text))}</code></pre>`,
-          )
-          break
-        case 'divider':
-          chunks.push('<hr />')
-          break
-        case 'image': {
-          const url =
-            data?.type === 'external'
-              ? data.external?.url
-              : data?.file?.url
-          const caption = plainText(data?.caption)
-          if (url) {
-            chunks.push(
-              `<figure><img src="${escapeAttr(url)}" alt="${escapeAttr(caption || '')}" /><figcaption>${escapeHtml(caption)}</figcaption></figure>`,
-            )
-          }
-          break
-        }
-        default:
-          if (text) chunks.push(`<p>${escapeHtml(text)}</p>`)
-      }
-    }
-
-    cursor = res.has_more ? res.next_cursor || undefined : undefined
-  } while (cursor)
-
-  return wrapLists(chunks.join('\n'))
-}
-
-function wrapLists(html: string): string {
-  return html
-    .replace(/(?:<li>[\s\S]*?<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
+function plainText(richText: NotionRichText[] | undefined): string {
+  return (richText || []).map((item) => item.plain_text).join('')
 }
 
 function escapeHtml(input: string): string {
@@ -214,24 +67,172 @@ function escapeAttr(input: string): string {
   return escapeHtml(input).replace(/"/g, '&quot;')
 }
 
-export async function fetchPublishedPosts(): Promise<BlogPost[]> {
-  const config = useRuntimeConfig()
-  const token = config.notionToken
-  const databaseId = config.notionDatabaseId
+function slugify(input: string): string {
+  const slug = input
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\u4e00-\u9fff-]/g, '')
+    .replace(/-+/g, '-')
+    .slice(0, 80)
 
-  if (!token || !databaseId) {
+  return slug || 'post'
+}
+
+function getProp(page: NotionPage, names: readonly string[]) {
+  for (const name of names) {
+    if (page.properties[name]) return page.properties[name]
+  }
+  return undefined
+}
+
+function readTitle(page: NotionPage): string {
+  const prop = getProp(page, PROPERTY_ALIASES.title)
+  if (prop?.type === 'title') return plainText(prop.title)
+  if (prop?.type === 'rich_text') return plainText(prop.rich_text)
+  return ''
+}
+
+/** 没有状态属性（或类型无法识别）时视为已发布。 */
+function readStatus(page: NotionPage): string {
+  const prop = getProp(page, PROPERTY_ALIASES.status)
+  if (prop?.type === 'select') return prop.select?.name || ''
+  if (prop?.type === 'status') return prop.status?.name || ''
+  return 'Published'
+}
+
+function readSlug(page: NotionPage): string {
+  const prop = getProp(page, PROPERTY_ALIASES.slug)
+  if (prop?.type === 'rich_text') return plainText(prop.rich_text)
+  if (prop?.type === 'url') return prop.url || ''
+  return ''
+}
+
+function readSummary(page: NotionPage): string {
+  const prop = getProp(page, PROPERTY_ALIASES.summary)
+  return prop?.type === 'rich_text' ? plainText(prop.rich_text) : ''
+}
+
+function readDate(page: NotionPage): string {
+  const prop = getProp(page, PROPERTY_ALIASES.date)
+  if (prop?.type === 'date') return prop.date?.start || ''
+  return new Date().toISOString().slice(0, 10)
+}
+
+function readTags(page: NotionPage): string[] {
+  const prop = getProp(page, PROPERTY_ALIASES.tags)
+  if (prop?.type !== 'multi_select') return []
+  return prop.multi_select.map((tag: { name: string }) => tag.name)
+}
+
+function readCover(page: NotionPage): string | undefined {
+  if (page.cover?.type === 'external') return page.cover.external?.url
+  if (page.cover?.type === 'file') return page.cover.file?.url
+  return undefined
+}
+
+function mapPageMeta(page: NotionPage): BlogPostMeta | null {
+  const title = readTitle(page)
+  if (!title) return null
+
+  const status = readStatus(page)
+  if (status && !PUBLISHED_STATUS_PATTERN.test(status)) return null
+
+  return {
+    id: page.id,
+    title,
+    slug: readSlug(page) || slugify(title),
+    summary: readSummary(page),
+    date: readDate(page),
+    tags: readTags(page),
+    cover: readCover(page),
+  }
+}
+
+function renderImage(data: any): string | null {
+  const url = data?.type === 'external' ? data.external?.url : data?.file?.url
+  if (!url) return null
+
+  const caption = plainText(data?.caption)
+  return `<figure><img src="${escapeAttr(url)}" alt="${escapeAttr(caption)}" /><figcaption>${escapeHtml(caption)}</figcaption></figure>`
+}
+
+function renderBlock(block: any): string | null {
+  const type = block.type as string
+  const data = block[type]
+  const text = escapeHtml(plainText(data?.rich_text))
+
+  switch (type) {
+    case 'paragraph':
+      return `<p>${text}</p>`
+    case 'heading_1':
+      return `<h1>${text}</h1>`
+    case 'heading_2':
+      return `<h2>${text}</h2>`
+    case 'heading_3':
+      return `<h3>${text}</h3>`
+    case 'bulleted_list_item':
+    case 'numbered_list_item':
+      return `<li>${text}</li>`
+    case 'quote':
+      return `<blockquote><p>${text}</p></blockquote>`
+    case 'code':
+      return `<pre><code>${text}</code></pre>`
+    case 'divider':
+      return '<hr />'
+    case 'image':
+      return renderImage(data)
+    default:
+      return text ? `<p>${text}</p>` : null
+  }
+}
+
+function wrapLists(html: string): string {
+  return html.replace(
+    /(?:<li>[\s\S]*?<\/li>\n?)+/g,
+    (match) => `<ul>${match}</ul>`,
+  )
+}
+
+async function blocksToHtml(client: Client, blockId: string): Promise<string> {
+  const chunks: string[] = []
+  let cursor: string | undefined
+
+  do {
+    const res = await client.blocks.children.list({
+      block_id: blockId,
+      start_cursor: cursor,
+      page_size: 100,
+    })
+
+    for (const block of res.results) {
+      if (!('type' in block)) continue
+      const html = renderBlock(block)
+      if (html !== null) chunks.push(html)
+    }
+
+    cursor = res.has_more ? res.next_cursor || undefined : undefined
+  } while (cursor)
+
+  return wrapLists(chunks.join('\n'))
+}
+
+export async function fetchPublishedPosts(): Promise<BlogPost[]> {
+  const { notionToken, notionDatabaseId } = useRuntimeConfig()
+
+  if (!notionToken || !notionDatabaseId) {
     return PLACEHOLDER_POSTS
   }
 
-  const client = new Client({ auth: token })
+  const client = new Client({ auth: notionToken })
 
-  const queried = await client.databases.query({
-    database_id: databaseId,
-    sorts: [{ property: 'Date', direction: 'descending' }],
-  }).catch(async () => {
+  const queried = await client.databases
+    .query({
+      database_id: notionDatabaseId,
+      sorts: [{ property: 'Date', direction: 'descending' }],
+    })
     // Date 属性名可能不同，退回无排序查询
-    return client.databases.query({ database_id: databaseId })
-  })
+    .catch(() => client.databases.query({ database_id: notionDatabaseId }))
 
   const metas: BlogPostMeta[] = []
   for (const result of queried.results) {
@@ -253,10 +254,5 @@ export async function fetchPublishedPosts(): Promise<BlogPost[]> {
 
 export async function fetchPostBySlug(slug: string): Promise<BlogPost | null> {
   const posts = await fetchPublishedPosts()
-  return posts.find((p) => p.slug === slug) || null
-}
-
-export async function listPostSlugs(): Promise<string[]> {
-  const posts = await fetchPublishedPosts()
-  return posts.map((p) => p.slug)
+  return posts.find((post) => post.slug === slug) || null
 }

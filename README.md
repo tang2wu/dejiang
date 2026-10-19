@@ -53,14 +53,14 @@ npm run dev
 
 ### B. 本机直接上传（不先建 GitHub 也能试）
 
+在仓库根目录执行：
+
 ```bash
-export PATH="$HOME/.local/node/bin:$PATH"
-cd /home/hirain/Blog
 npm run generate
-npx wrangler pages deploy .output/public --project-name=tangdejiang
+npx wrangler pages deploy .output/public --project-name=dejiang
 ```
 
-首次会打开浏览器登录 Cloudflare；成功后同样得到 `https://tangdejiang.pages.dev`。  
+首次会打开浏览器登录 Cloudflare；成功后同样得到 `https://dejiang.pages.dev`。  
 若项目名已被占用，改 `--project-name` 即可（网址跟着变）。
 
 ## 内容修改位置
@@ -68,6 +68,7 @@ npx wrangler pages deploy .output/public --project-name=tangdejiang
 | 内容 | 文件 |
 |------|------|
 | 姓名、定位、经历、项目、技能 | `data/site.ts` |
+| 博客文章类型定义 | `types/blog.ts` |
 | 视觉与排版 | `assets/css/main.css` |
 | Notion 拉取逻辑 | `server/utils/notion.ts` |
 

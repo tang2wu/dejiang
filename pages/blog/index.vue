@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import type { BlogPostMeta } from '~/data/site'
+import { site } from '~/data/site'
+import type { BlogPostMeta } from '~/types/blog'
 
 const { data: posts, error } = await useFetch<BlogPostMeta[]>('/api/posts', {
   default: () => [],
 })
 
 useSeoMeta({
-  title: '技术笔记 · 汤德江',
+  title: `技术笔记 · ${site.name}`,
   description: '从 Notion 同步的可公开技术笔记与工作记录。',
 })
 </script>

@@ -20,8 +20,7 @@ export const site = {
   title: '数据闭环开发工程师（偏车端）',
   city: '上海',
   email: 'tangdejiang01@gmail.com',
-  tagline:
-    '把车端采集、回传与闭环链路做稳，让数据真正驱动迭代。',
+  tagline: '把车端采集、回传与闭环链路做稳，让数据真正驱动迭代。',
   about: [
     '我是汤德江，数据闭环开发工程师，工作重心在车端侧：采集、传输、存储与闭环流程的落地与打磨。',
     '面向招聘方，这里汇总我的经历、项目与可公开的技术笔记；文章来自 Notion，偶尔更新。',
@@ -67,25 +66,10 @@ export const site = {
     {
       name: '工具与自动化',
       role: '开发',
-      summary:
-        '用脚本与小工具缩短联调、日志分析与回归验证成本。',
+      summary: '用脚本与小工具缩短联调、日志分析与回归验证成本。',
       tags: ['自动化', '工程效率'],
       outcome: '占位：补充具体工具名与收益',
     },
   ] satisfies SiteProject[],
   contactNote: '欢迎邮件联系；若需微信或简历 PDF，可在邮件中说明。',
 } as const
-
-export type BlogPostMeta = {
-  id: string
-  title: string
-  slug: string
-  summary: string
-  date: string
-  tags: string[]
-  cover?: string
-}
-
-export type BlogPost = BlogPostMeta & {
-  contentHtml: string
-}

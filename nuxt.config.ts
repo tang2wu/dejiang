@@ -26,11 +26,7 @@ export default defineNuxtConfig({
       ],
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: '',
-        },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Outfit:wght@500;600;700&display=swap',
@@ -52,12 +48,8 @@ export default defineNuxtConfig({
   nitro: {
     prerender: {
       crawlLinks: true,
-      routes: [
-        '/',
-        '/blog',
-        '/blog/vehicle-side-data-loop',
-        '/blog/weak-network-upload-notes',
-      ],
+      // 文章详情页由 crawlLinks 从 /blog 列表自动发现，无需逐条列出
+      routes: ['/', '/blog'],
     },
   },
 })
